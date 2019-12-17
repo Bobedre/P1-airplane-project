@@ -1,0 +1,360 @@
+/* P1 Project gruppe SW409                                                  */
+/* NAVN:                      STUDIE NR:          EMAIL:                    */
+/* Bo Christensen,            20194259,            bchri19@student.aau.dk   */
+/* Fatima Osman Aden Mohamed  20193589             fmoham19@student.aau.dk  */
+/* Søren Drejer Jakobsgaard,  STUDIENR MANGLER,    sdja19@student.aau.dk    */
+/* Jacob Carstensen,          20193560 ,           jcarst19@student.aau.dk  */
+/* Jonas Hjortshøj Rysz,      201886148,           jrysz18@student.aau.dk   */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <strings.h>
+#include <time.h>
+
+#define MAX_ROW_SIZE 30
+#define NUMBER_OF_PASSENGERS 181
+#define MAX_AISLE_SIZE 7
+#define AISLE 3
+#define NUMBER_OF_SEATS 180
+
+
+/* PASSAGER STRUCT */
+typedef struct {
+    int seat;      /* Seatnumber                                                   */
+    int delay;     /* Countdown to when agent is allowed to do an action           */
+    int luggage;   /* How long it takes for the passenger to stow           */
+    int stow;      /* True or false - to see if the specific agent is done stowing */
+    int is_seated; /* True or false - to see wether the specific agent is seated   */
+} passenger;
+
+
+/* Prototyper */
+void prompt_for_input(int *a, int *b, int *c,int *);
+void boardingmethod (int choice, int queue[]);
+void back_to_front(int*);
+void wilma (int *);
+void random_queue (int *);
+void create_passengers(passenger * agents, int baggage);
+void run_simulator(passenger * agents,int queue [], int walk_delay ,double * iteration, int airplane [][7]);
+void stow_proces(int i, passenger *agents, int airplane [][7], int walk_delay);
+int seat_interference(int airplane[][7], passenger *agents,int row);
+void sit_down(int i, int *seated_count, passenger * agents, int airplane[][7]);
+void movement(int i, passenger *agents, int airplane [][7], int walk_delay);
+void call_next_passenger(int queue[], int *queue_position ,int airplane [][7],passenger *agents, int walk_delay);
+void print_fly(int airplane[][7]);
+void print_seated(passenger * agents);
+void shuffle(int queue[],int i,int j);
+void reverse_array(int array[], int n);
+
+int main(void){
+    passenger agents[NUMBER_OF_SEATS+1];
+    int queue[NUMBER_OF_SEATS];
+    int baggage = 0;
+    int walk_delay = 0;
+    int n_simulations = 0;
+    int n = 0;
+    int choice = 0;
+    int sum = 0;
+    int average_sum=0;
+    int airplane[MAX_ROW_SIZE][MAX_AISLE_SIZE];
+    double iteration = 0; 
+    double * array_of_iterations;
+    FILE *fp;
+    fp = fopen("output.csv","w");
+
+
+    int i, j, counter = 1;
+    for ( i = 0; i < MAX_ROW_SIZE; i++){
+        for ( j = 0; j < MAX_AISLE_SIZE; j++){
+            if(j == 3){
+                airplane[i][j] = 0;
+            }
+            else{
+                airplane[i][j] = counter; 
+                counter++;
+            }
+        }
+    }
+      
+    srand (time(NULL));
+    prompt_for_input(&baggage, &walk_delay, &choice, &n_simulations);
+
+    array_of_iterations = (double*) calloc (n_simulations,sizeof(double));
+    /*MAKE TO FUNCTION - RUN SIMULATOR*/
+    for (n = 0; n < n_simulations ; n++){
+        iteration = 0.0;
+        boardingmethod(choice, queue);  
+        for( i=0;i<180;i++){
+            printf("%d %d\n",i, queue[i]);
+        }
+        create_passengers(agents, baggage); 
+        run_simulator(agents,queue,walk_delay,&iteration,airplane);
+
+        array_of_iterations[n]=iteration;
+    }
+    /* Forloop er printer de forskellige iterationer og skriver i en csv fil*/
+    for(n = 0; n < n_simulations; n++){
+        printf("%.1lf\n",array_of_iterations[n]);
+        fprintf(fp,"%.0lf\n",array_of_iterations[n]);
+        sum += array_of_iterations[n];
+    }
+    average_sum = sum/n_simulations;
+    printf("Average %.1lf\n",average_sum);
+
+    printf("This took %.2lf iterations and this equals %.2lf seconds which is equal to %lf in minutes", iteration, iteration*0.1, (iteration*0.1)/60);
+    free(array_of_iterations);
+    fclose(fp);
+    return 0;
+}
+/* Userinputs for gå hastiheden, tiden det tage at sturve baggage, boarding method og antal simulationer*/
+void prompt_for_input(int *a, int *b, int *c,int *n){
+    printf("How long does it take to stow luggage?: \n");
+    scanf("%d", a);
+    printf("How long does it take a passenger to walk?: \n");
+    scanf("%d", b);
+    printf("Type 1 for Back to front\nType 2 for WILMA\nType 3 for Random\n: ");
+    scanf("%d", c);
+    printf("Type number of simulations?: \n" );
+    scanf("%d" ,n);
+}
+/* Bruger den valgte boarding metode og genere en rækkefølge af agenter ud fra */
+void boardingmethod (int choice, int queue[]){
+switch(choice)
+    {
+        case 1:
+            back_to_front(queue);  
+        break;
+        case 2:
+            wilma(queue);
+        break;
+        case 3:
+            random_queue(queue);
+        break;
+        default:
+        break;
+    }
+}
+
+void back_to_front(int queue[]){
+    int i, x = 180, c, p;
+
+    for (i = 0; i < NUMBER_OF_SEATS; i++){       /* tildeler alle pladser i arrayet nul */
+        queue[i]=0;
+    }
+
+    for (p = 0; p < 6; p++){                    /* p bliver brugt til at indele boarding grupperne så de bagerste kommer ind først*/
+        shuffle(queue,p*NUMBER_OF_SEATS/6,(p+1)*NUMBER_OF_SEATS/6);
+    }  
+    reverse_array(queue, NUMBER_OF_SEATS);
+}
+
+void wilma(int queue[]){
+    int i, x, c;
+    for (i = 0; i < NUMBER_OF_SEATS; i++){  /* tildeler alle pladser i arrayet nul */
+        queue[i]=0;
+    }
+    for(x = 1; x <= NUMBER_OF_SEATS; x++){
+        while (1) {             /* if statements i denne while loop sørger for at window seats kommer ind første efter fuldt af middle og aisle*/
+            c = rand() % 60;    /* Hvis f.eks at den værdi x er lige nu er kongruent med 2 eller 5 når 'MOD 6' så vil koden se om pladse c+60 i queue er optaget eller ej og om den plads i såfald skal have det nuværende x*/
+            if ((x%6==1||x%6==0)&&queue[c] == 0) {
+                queue[c] = x ; 
+                break;
+            }  
+            else if ((x%6==2||x%6==5)&&queue[c+60] == 0) {
+                queue[c+60] = x ; 
+                break;
+            }  
+            else if ((x%6==3||x%6==4)&&queue[c+120] == 0) {
+                queue[c+120] = x ; 
+                break;
+            } 
+                 
+        } 
+    }  
+}
+void random_queue (int queue[]){
+    int i;
+
+    for (i = 0; i < NUMBER_OF_SEATS; i++){ /* tildeler alle pladser i arrayet nul */
+        queue[i]=0;
+    }
+
+    shuffle(queue, 0, NUMBER_OF_SEATS);
+}
+
+/*  Giver alle stucts i agents arrayet et seat nummer og alle andre parameter i structsne bliver nul */
+void create_passengers(passenger * agents, int baggage){
+    int i;
+    for (i = 0; i < NUMBER_OF_PASSENGERS; i++){
+        agents[i].seat = i;
+        agents[i].delay = 0;
+        agents[i].stow = 0;
+        agents[i].is_seated = 0;
+        agents[i].luggage = baggage;    
+    }
+}
+void run_simulator(passenger * agents,int queue [], int walk_delay,double * iteration, int airplane [][7]){
+    int i;
+    int seated_count = 0;
+    int queue_position = 0;
+
+    while (seated_count != 180){         
+  
+        print_fly(airplane); 
+            
+            for ( i = MAX_ROW_SIZE-1; i >= 0; i--){
+              
+                if(airplane[i][AISLE] == 0){  /* tjekker om der står en agent på pladsen i midtergangen. Den starter fra række 29*/
+                    continue;
+                }
+                if (agents[airplane[i][AISLE]].delay != 0){ /* Denne tjekker om agenten er i gang med noget */
+                    agents[airplane[i][AISLE]].delay--; /* Hvis agenten ikke har lov til at lave en handling endnu går delay 1 ned og programmet kigger på næste plads*/
+                }
+                else if (agents[airplane[i][AISLE]].seat <= airplane[i][6]){ /* Tjekker om agenten står på den rigtige række */
+                    /* Tjekker om agenten har lagt sin taske på plads */
+                    if (agents[airplane[i][AISLE]].stow == 0) {
+                        stow_proces(i, agents, airplane, walk_delay);
+                    }
+                    /* Hvis agenten har sturvet så kører sit_down */
+                    else if (agents[airplane[i][AISLE]].stow == 1){
+                        sit_down (i,&seated_count,agents,airplane);                       
+                    }                        
+                }
+                else if(airplane[i+1][AISLE] == 0){ /* Tjekker om pladsen foran agenten er optaget */
+                    movement(i, agents, airplane, walk_delay);
+                }    
+            }
+       
+        call_next_passenger(queue, &queue_position, airplane, agents, walk_delay); 
+  
+        /*printf("seat count: %d\n",seated_count);*/
+        *iteration = *iteration + 1;
+        }
+}
+
+/*  print_fly looper igennem alle rækker i airplane arrayet og printer sædderne og hvilke agenter der står i midtergangen  */
+void print_fly(int airplane[][7]){
+    int i, j;
+    printf(" Window\t Middle\t Aisle\t\t Aisle\t Middle\t Window\t\n");
+    for (i = 0 ; i < MAX_ROW_SIZE ; i++){
+        for (j = 0 ; j < 7 ; j++){
+            printf(" %d\t",airplane[i][j]);
+            }
+            printf("\n");
+        }
+        printf("\n");
+}
+/* Funktion som simulere den tid det tager agenten af ligge sin taske på plads og den tid det tager ekstra når agenten skal ind  forbi andre siddende agenter*/
+void stow_proces(int i, passenger *agents, int airplane [][7], int walk_delay){
+
+    agents[airplane[i][AISLE]].delay += (80*seat_interference(airplane, agents, i));
+    agents[airplane[i][AISLE]].delay += walk_delay; /* Ligger tid til delay på agenten */
+    agents[airplane[i][AISLE]].delay += agents[airplane[i][3]].luggage;
+    agents[airplane[i][AISLE]].stow = 1; /* Ændrer stow værdien fra 0 til 1 */
+    
+}
+/* simulere sæde interens */
+int seat_interference(int airplane [][7], passenger *agents,int row){
+    int number_seated = 0;
+    /* Den første If statement bliver brugt til at checke om det er højre eller venstre side agenten skal sidde*/
+    /*RIGHT SIDE */
+    if (airplane[row][AISLE+1] <=  airplane[row][AISLE]){
+        /* MOD 3 == 0 checker om agenten skal helt ind på vindues 
+        pladsen og i såfald checker den de to sædder før vindues pladsen og tæller number_seated op */
+        if (airplane[row][AISLE] % 3 == 0){ 
+            if (agents[airplane[row][AISLE+1]].is_seated){
+                number_seated++;
+            }
+            if (agents[airplane[row][AISLE+2]].is_seated){
+                number_seated++;
+            }
+        }
+        /* HVis agenten skal ind på midter sæddet så checker den kun på en plads og hvis det heller ikke er sand
+        så skal agenten ind på midtergangs sæddet og den behøver ikke checke noget*/
+            else if (agents[airplane[row][AISLE]].seat % 3 == 2){
+                if (agents[airplane[row][AISLE+1]].is_seated){
+                    number_seated++;
+            }
+        }
+    }
+    /* Samme logik som højre siddet men nogle værdier er blevet ændret for at tigå de rigtige pladser*/
+    /* LEFT SIDE */
+    else {
+        if (airplane[row][AISLE] % 3 == 1){
+            if (agents[airplane[row][AISLE-1]].is_seated){
+                number_seated++;
+            }
+            if (agents[airplane[row][AISLE-2]].is_seated){
+                number_seated++;
+            }
+        }
+        else if (agents[airplane[row][AISLE]].seat % 3 == 2){
+            if (agents[airplane[row][AISLE-1]].is_seated){
+                number_seated++;
+            }
+        }
+    }
+    /* Retunere antallet af agenter der blokere som bliver ganget på et tal ude i stow_process*/
+    return number_seated;
+}
+/* Ændre agentens is_seated til 1 og fjerner agenten fra midtergangen. Tæller også seated_count */
+void sit_down(int i, int *seated_count, passenger * agents,int airplane[][7]){
+    agents[airplane[i][AISLE]].is_seated=1; /* Passegeren sætter sig på sin plads - bliver tildelt en værdi i agentens struct*/
+    airplane[i][AISLE]=0; /*fjerne passageren fra midtergangen */
+    *seated_count = *seated_count + 1;
+}
+/* Kopiere værdien fra den nuværende posistion i midtergangen til en plads foran og laver den nuværende positions værdi til 0 for at simulere en person der går frem ad*/
+void movement(int i, passenger *agents, int airplane [][7], int walk_delay){
+     airplane[i+1][AISLE] = agents[airplane[i][3]].seat; /* Ændrer værdien på pladsen foran agenten til agentens værdi og ændrer den nuværende til 0 */
+        airplane[i][AISLE]=0;
+            agents[airplane[i+1][AISLE]].delay += walk_delay; /* DELAY EFTER HAN HAR FLYTTET SIG - SKRIV I MODEL */
+
+}
+/* Checker om der er plads i indgangen af flyet "airplane[0][AISLE]==0" og hvis der er så tager den en værdi fra queue som er tidligere genereret */
+void call_next_passenger(int queue[], int *queue_position ,int airplane [][7],passenger *agents, int walk_delay){
+    if(airplane[0][AISLE] == 0){
+        if (*queue_position < 180){
+            airplane[0][AISLE] = queue[*queue_position];
+            *queue_position = *queue_position+1;
+            agents[airplane[0][AISLE]].delay = walk_delay;
+        }
+    }
+}
+/* Printer hvem der sidder ned i en simulering blev brugt til at checke om koden var korrekt */
+void print_seated(passenger * agents){ 
+    int i;
+    for (i = 0 ; i < NUMBER_OF_PASSENGERS; i++){
+        if (agents[i].is_seated == 1){
+            printf("PASSENGERS SEATED: %d \n", agents[i].seat);
+        }
+    }
+}
+
+void shuffle(int queue[],int i,int j) {
+    int x, c;
+    for(x = i; x < j; x++){ /* c =rand()%180; gør c til en tilfældig plads i arrayet og tildeler dem x. Hvis queue[c] ikke er lig nul kører while loopen*/
+        while(1){  
+            c = (rand() % (j - i)) + i;     
+            if(queue[c] == 0){
+                queue[c] = x + 1;         
+                break;              
+            }    
+        }              
+    }
+}
+
+void reverse_array(int array[], int n)
+{
+    int i, j, a;
+    for (i = 0; i < n/2 ; i++)
+    {
+        j = n - (i + 1);
+        a = array[j];
+        array[j] = array[i];
+        array[i] = a;
+    }   
+}
+
+
+
+
