@@ -1,11 +1,11 @@
 /* P1 Project gruppe SW409                                                        */
 /* NAVN:                        STUDIE NR:              EMAIL:                    */
 /* Bo Christensen,                  20194259,            bchri19@student.aau.dk   */
-/* Fatima Osman Aden Mohamed        20193589             fmoham19@student.aau.dk  */
-/* Søren Drejer Jakobsgaard,        STUDIENR MANGLER,    sdja19@student.aau.dk    */
-/* Jacob Carstensen,                20193560 ,           jcarst19@student.aau.dk  */
+/* Fatima Osman Aden Mohamed        20193589,             fmoham19@student.aau.dk */
+/* Søren Drejer Jakobsgaard,        20194257,            sdja19@student.aau.dk    */
+/* Jacob Carstensen,                20193560,           jcarst19@student.aau.dk   */
 /* Jonas Hjortshøj Rysz,            201886148,           jrysz18@student.aau.dk   */
-/* Morten Koch Rønnenkamp Nielsen   20195086,            mkrn19@students.aau.dk   */                                                       */
+/* Morten Koch Rønnenkamp Nielsen   20195086,            mkrn19@students.aau.dk   */                                                   
 
 
 #include <stdio.h>
